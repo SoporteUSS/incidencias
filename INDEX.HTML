@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DASHBOARD DE TICKETS - SOPORTE TÉCNICO</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100 text-gray-800">
+  <header class="bg-blue-800 text-white p-4 shadow-md">
+    <h1 class="text-2xl font-bold">DASHBOARD DE TICKETS - SOPORTE TÉCNICO</h1>
+  </header>
+
+  <main class="p-6 grid gap-6">
+    <!-- KPIs -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <h2 class="text-lg font-semibold text-gray-500">TOTAL DE TICKETS</h2>
+        <p id="totalTickets" class="text-3xl font-bold text-blue-700">0</p>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <h2 class="text-lg font-semibold text-gray-500">TICKETS RESUELTOS</h2>
+        <p id="ticketsResueltos" class="text-3xl font-bold text-green-600">0</p>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <h2 class="text-lg font-semibold text-gray-500">TICKETS PENDIENTES</h2>
+        <p id="ticketsPendientes" class="text-3xl font-bold text-red-600">0</p>
+      </div>
+    </section>
+
+    <!-- Filtros -->
+    <section class="bg-white p-4 rounded-xl shadow grid gap-4 sm:grid-cols-4">
+      <div>
+        <label class="font-semibold">TIPO DE USUARIO</label>
+        <select id="filtroUsuario" class="w-full border rounded p-2 uppercase">
+          <option value="">TODOS</option>
+          <option>ALUMNO</option>
+          <option>DOCENTE</option>
+          <option>ADMINISTRATIVO</option>
+        </select>
+      </div>
+      <div>
+        <label class="font-semibold">ESTADO</label>
+        <select id="filtroEstado" class="w-full border rounded p-2 uppercase">
+          <option value="">TODOS</option>
+          <option>SIN ASIGNAR</option>
+          <option>ASIGNADO</option>
+          <option>EN ATENCIÓN</option>
+          <option>RESUELTO</option>
+          <option>PROGRAMADO</option>
+          <option>EN ESPERA DE RESPUESTA</option>
+        </select>
+      </div>
+      <div>
+        <label class="font-semibold">ASISTENTE TÉCNICO</label>
+        <input id="filtroTecnico" type="text" class="w-full border rounded p-2 uppercase" placeholder="EJ. JAVIER FLORES">
+      </div>
+      <div class="flex items-end">
+        <button id="btnFiltrar" class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded w-full uppercase font-semibold">FILTRAR</button>
+      </div>
+    </section>
+
+    <!-- Gráficos -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white p-4 rounded-xl shadow">
+        <h3 class="font-semibold mb-2">TICKETS POR ESTADO</h3>
+        <canvas id="chartEstado"></canvas>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow">
+        <h3 class="font-semibold mb-2">TICKETS POR TIPO DE USUARIO</h3>
+        <canvas id="chartUsuario"></canvas>
+      </div>
+    </section>
+
+    <!-- Tabla -->
+    <section class="bg-white p-4 rounded-xl shadow overflow-x-auto">
+      <h3 class="font-semibold mb-4">DETALLE DE TICKETS</h3>
+      <table class="min-w-full border text-sm uppercase">
+        <thead class="bg-blue-800 text-white">
+          <tr>
+            <th class="p-2 border">ID</th>
+            <th class="p-2 border">FECHA</th>
+            <th class="p-2 border">TIPO USUARIO</th>
+            <th class="p-2 border">TIPO DE INCIDENCIA</th>
+            <th class="p-2 border">ESTADO</th>
+            <th class="p-2 border">ASISTENTE TÉCNICO</th>
+            <th class="p-2 border">PRIORIDAD</th>
+          </tr>
+        </thead>
+        <tbody id="tablaTickets"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/1NGxkXJYIreZdvWKsJnKerFvFgjCkfNpB710WHrV1X1o/gviz/tq?tqx=out:csv&sheet=INCIDENCIAS";
+
+    let dataGlobal = [];
+
+    async function cargarDatos() {
+      const res = await fetch(SHEET_URL);
+      const text = await res.text();
+      const rows = text.split("\n").map(r => r.split(","));
+      const headers = rows[0];
+      const data = rows.slice(1).map(r => Object.fromEntries(r.map((v, i) => [headers[i]?.trim().toUpperCase(), v.trim().toUpperCase()])));
+      dataGlobal = data;
+      renderDashboard(dataGlobal);
+    }
+
+    function renderDashboard(data) {
+      // KPIs
+      const total = data.length;
+      const resueltos = data.filter(d => d.ESTADO === "RESUELTO").length;
+      const pendientes = total - resueltos;
+      document.getElementById("totalTickets").textContent = total;
+      document.getElementById("ticketsResueltos").textContent = resueltos;
+      document.getElementById("ticketsPendientes").textContent = pendientes;
+
+      // Tabla
+      const tabla = document.getElementById("tablaTickets");
+      tabla.innerHTML = data.map(d => `
+        <tr class="hover:bg-gray-50">
+          <td class="p-2 border">${d.ID}</td>
+          <td class="p-2 border">${d["FECHA CREACION DE TICKET"]}</td>
+          <td class="p-2 border">${d.TIPO_USUARIO}</td>
+          <td class="p-2 border">${d["TIPO DE INCIDENCIA"]}</td>
+          <td class="p-2 border">${d.ESTADO}</td>
+          <td class="p-2 border">${d["ASISTENTE TECNICO"]}</td>
+          <td class="p-2 border">${d.PRIORIDAD}</td>
+        </tr>
+      `).join("");
+
+      // Gráficos
+      const ctxEstado = document.getElementById("chartEstado").getContext("2d");
+      const estados = [...new Set(data.map(d => d.ESTADO))];
+      const conteoEstados = estados.map(e => data.filter(d => d.ESTADO === e).length);
+      new Chart(ctxEstado, {
+        type: "bar",
+        data: {
+          labels: estados,
+          datasets: [{ label: "TICKETS", data: conteoEstados, backgroundColor: "#2563eb" }]
+        }
+      });
+
+      const ctxUsuario = document.getElementById("chartUsuario").getContext("2d");
+      const usuarios = [...new Set(data.map(d => d.TIPO_USUARIO))];
+      const conteoUsuarios = usuarios.map(u => data.filter(d => d.TIPO_USUARIO === u).length);
+      new Chart(ctxUsuario, {
+        type: "pie",
+        data: {
+          labels: usuarios,
+          datasets: [{ data: conteoUsuarios, backgroundColor: ["#2563eb", "#22c55e", "#f97316"] }]
+        }
+      });
+    }
+
+    document.getElementById("btnFiltrar").addEventListener("click", () => {
+      const tipo = document.getElementById("filtroUsuario").value;
+      const estado = document.getElementById("filtroEstado").value;
+      const tecnico = document.getElementById("filtroTecnico").value.toUpperCase();
+
+      const filtrado = dataGlobal.filter(d =>
+        (!tipo || d.TIPO_USUARIO === tipo) &&
+        (!estado || d.ESTADO === estado) &&
+        (!tecnico || (d["ASISTENTE TECNICO"] || "").includes(tecnico))
+      );
+      renderDashboard(filtrado);
+    });
+
+    cargarDatos();
+  </script>
+</body>
+</html>
